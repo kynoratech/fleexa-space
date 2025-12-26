@@ -6,16 +6,16 @@ import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
 import {
   collection, onSnapshot, query, orderBy,
-  doc, setDoc, deleteDoc, serverTimestamp
+  doc, deleteDoc
 } from "firebase/firestore";
 import Link from "next/link";
 import {
-  Trash2, PlusCircle, Wallet,
-  LogOut, TrendingUp, TrendingDown, CalendarDays, FileText,
-  ArrowLeft,
-  Receipt
+  PlusCircle, Wallet, LogOut, TrendingUp, TrendingDown, 
+  CalendarDays, Receipt, ArrowUpRight, Search, Sparkles, Filter
 } from "lucide-react";
 import { motion } from "framer-motion";
+
+import WorkspaceTopBar from "../../components/WorkspaceTopBar";
 
 type Movimiento = {
   id: string;
@@ -26,216 +26,233 @@ type Movimiento = {
   moneda: string;
   categoria: "ingreso" | "gasto";
   fecha: string;
-  notas: string;
   createdAt?: any;
-  updatedAt?: any;
-  eliminado?: boolean;
 };
 
 export default function FinanzasPage() {
   const router = useRouter();
   const pathname = usePathname();
-  const [user, setUser] = useState<{uid:string, email:string} | null>(null);
+  const [user, setUser] = useState<any>(null);
   const [movimientos, setMovimientos] = useState<Movimiento[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  
+  // 🔹 Estado para filtrar por moneda
+  const [selectedCurrency, setSelectedCurrency] = useState("CLP");
 
-  /* ========== AUTH ========== */
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (usr) => {
-      if (!usr?.uid) {
+      if (!usr) {
         router.push("/login");
       } else {
-        setUser({ uid: usr.uid, email: usr.email! });
+        setUser(usr);
+        const ref = collection(db, "finanzas");
+        const q = query(ref, orderBy("createdAt", "desc"));
+
+        return onSnapshot(q, (snap) => {
+          const data = snap.docs
+            .map(d => ({ id: d.id, ...d.data() } as Movimiento))
+            .filter(m => m.userId === usr.uid);
+          setMovimientos(data);
+          setLoading(false);
+        });
       }
     });
     return () => unsub();
   }, [router]);
 
-  /* ========== FIRESTORE LISTENER ========== */
-  useEffect(() => {
-    if (!user?.uid) return;
-
-    const ref = collection(db, "finanzas");
-    const q = query(ref, orderBy("createdAt", "desc"));
-
-    const unsub = onSnapshot(q, (snap) => {
-      const data = snap.docs.map(d => d.data()).map((docData, i) => {
-        const id = snap.docs[i].id;
-        return {
-          id,
-          userId: docData.userId,
-          nombre: docData.nombre ?? "Sin título",
-          descripcion: docData.descripcion ?? "Sin descripción",
-          valor: Number(docData.valor) || 0,
-          moneda: docData.moneda ?? "CLP",
-          categoria: docData.categoria === "ingreso" ? "ingreso" : "gasto",
-          fecha: docData.fecha ?? new Date().toISOString().split("T")[0],
-          notas: docData.notas ?? "",
-          createdAt: docData.createdAt,
-          updatedAt: docData.updatedAt,
-          eliminado: docData.eliminado ?? false
-        } satisfies Movimiento;
-      }).filter(m => m.userId === user.uid && !m.eliminado);
-
-      setMovimientos(data);
-      setLoading(false);
-    });
-
-    return () => unsub();
-  }, [user]);
-
-  /* ========== CREATE ========== */
-  async function handleCreate() {
-    const usr = auth.currentUser;
-    if (!usr?.uid) return alert("Debes iniciar sesión");
-
-    const id = crypto.randomUUID();
-    const ref = doc(db, "finanzas", id);
-
-    await setDoc(ref, {
-      userId: usr.uid,
-      nombre: "",
-      descripcion: "",
-      valor: 0,
-      moneda: "CLP",
-      categoria: "gasto",
-      fecha: new Date().toISOString().split("T")[0],
-      notas: "",
-      notasInternas: "",
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-      eliminado: false
-    });
-
-    // Como aún no tienes vista edit, lo dejamos sin ruta 404
-    alert("Movimiento creado correctamente");
-  }
-
-  /* ========== DELETE ========== */
-  async function handleDelete(id: string) {
-    const usr = auth.currentUser;
-    if (!usr?.uid) return alert("Debes iniciar sesión");
-
-    const ref = doc(db, "finanzas", id);
-    if (confirm("¿Eliminar este movimiento?")) {
-      await deleteDoc(ref); // hard delete real, puedes cambiar a soft luego si quieres
-    }
-  }
-
-  /* ========== KPIs ========== */
-  const kpis = useMemo(() => {
-    let ingresos = 0;
-    let gastos = 0;
-
-    movimientos.forEach(m => {
-      if (m.categoria === "ingreso") ingresos += m.valor;
-      else gastos += m.valor;
-    });
-
-    const balance = ingresos - gastos;
-    const total = ingresos + gastos;
-
-    return { ingresos, gastos, balance, total };
+  // 🔹 Obtener lista de monedas únicas presentes en los datos
+  const availableCurrencies = useMemo(() => {
+    const currencies = Array.from(new Set(movimientos.map(m => m.moneda)));
+    return currencies.length > 0 ? currencies : ["CLP", "USD"];
   }, [movimientos]);
 
-  if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-[#0B1220] text-indigo-400 text-xs font-bold uppercase tracking-widest">
-      Cargando Finanzas...
-    </div>
-  );
+  // 🔹 KPIs filtrados por la moneda seleccionada
+  const kpis = useMemo(() => {
+    let ingresos = 0; let gastos = 0;
+    movimientos
+      .filter(m => m.moneda === selectedCurrency)
+      .forEach(m => m.categoria === "ingreso" ? ingresos += m.valor : gastos += m.valor);
+    return { ingresos, gastos, balance: ingresos - gastos };
+  }, [movimientos, selectedCurrency]);
 
-  /* ========== UI ========== */
+  const filteredMovimientos = useMemo(() => {
+    const term = search.toLowerCase();
+    return movimientos.filter(m => 
+      (m.nombre?.toLowerCase().includes(term) || m.descripcion?.toLowerCase().includes(term)) &&
+      m.moneda === selectedCurrency
+    );
+  }, [movimientos, search, selectedCurrency]);
+
+  if (!user) return null;
+
   return (
     <div className="min-h-screen flex bg-[#0B1220] text-slate-100 font-sans">
-
-      {/* SIDEBAR */}
-      <aside className="w-64 bg-[#0E1629]/80 border-r border-white/5 px-6 py-6 flex flex-col fixed h-full z-20">
-        <div className="mb-12 flex items-center gap-3 px-2">
-          <div className="h-10 w-10 rounded-2xl bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center shadow-lg">
-            <Wallet size={20} className="text-white"/>
+      
+      <aside className="w-64 bg-[#0E1629]/80 backdrop-blur-xl border-r border-white/5 px-6 py-6 flex flex-col fixed h-full z-20">
+        <div className="mb-12 flex items-center gap-3">
+          <div className="h-10 w-10 rounded-2xl bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center shadow-lg text-white">
+            <Wallet size={20} />
           </div>
-          <p className="text-sm font-semibold">Fleexa Space</p>
+          <div>
+            <p className="text-sm font-semibold tracking-tight text-white">Fleexa Space</p>
+            <p className="text-[11px] text-slate-400">Workspace</p>
+          </div>
         </div>
 
         <nav className="flex flex-col gap-1 text-sm flex-1">
-          <Link href="/dashboard" className="px-3 py-2.5 rounded-xl hover:bg-white/5 text-slate-400">Dashboard</Link>
-          <Link href="/dashboard/finanzas" className="px-3 py-2.5 rounded-xl bg-white/10 text-white font-medium">Finanzas</Link>
+          <SidebarLink href="/dashboard" label="Dashboard" active={pathname === "/dashboard"} />
+          <SidebarLink href="/dashboard/clientes" label="Clientes" active={pathname.includes("/dashboard/clientes")} />
+          <SidebarLink href="/dashboard/proyectos" label="Proyectos" active={pathname.includes("/dashboard/proyectos")} />
+          <SidebarLink href="/dashboard/finanzas" label="Finanzas" active={pathname.includes("/dashboard/finanzas")} />
         </nav>
 
         <div className="pt-6 mt-auto border-t border-white/5">
-          <button onClick={() => signOut(auth)} className="flex items-center gap-2 text-xs text-red-400/80 hover:text-red-300">
-            <LogOut size={14}/> Cerrar sesión
+          <p className="text-[11px] truncate text-slate-500 mb-2">{user.email}</p>
+          <button onClick={() => signOut(auth)} className="flex items-center gap-2 text-xs text-red-400/80 hover:text-red-300 transition">
+            <LogOut size={14} /> Cerrar sesión
           </button>
         </div>
       </aside>
 
-      {/* MAIN */}
-      <main className="flex-1 ml-64 px-14 py-10 overflow-y-auto bg-gradient-to-br from-[#0B1220] via-[#0E1629] to-[#0B1220]">
-
-        {/* HEADER */}
-        <div className="flex justify-between items-center mb-10">
-          <Link href="/dashboard" className="flex items-center gap-2 text-slate-500 hover:text-white text-xs font-bold uppercase tracking-widest">
-            <ArrowLeft size={14}/> Volver
-          </Link>
-
-          <button
-            onClick={handleCreate}
-            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2.5 rounded-xl text-xs font-bold shadow-lg active:scale-95"
-          >
-            <PlusCircle size={14}/> Nuevo Movimiento
-          </button>
+      <main className="flex-1 ml-64 px-14 py-10 min-h-screen bg-gradient-to-br from-[#0B1220] via-[#0E1629] to-[#0B1220]">
+        
+        <div className="mb-8">
+          <WorkspaceTopBar />
         </div>
 
-        {/* KPIs */}
-        <div className="grid grid-cols-4 gap-6 mb-10">
-          <FinKpi label="Ingresos" value={`$${kpis.ingresos.toLocaleString()} CLP`} icon={<TrendingUp size={18}/>}/>
-          <FinKpi label="Gastos" value={`$${kpis.gastos.toLocaleString()} CLP`} icon={<TrendingDown size={18}/>}/>
-          <FinKpi label="Balance" value={`$${kpis.balance.toLocaleString()} CLP`} icon={<Wallet size={18}/>}/>
-          <FinKpi label="Total" value={`$${kpis.total.toLocaleString()} CLP`} icon={<Receipt size={18}/>}/>
+        <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between mb-12">
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <Sparkles size={16} className="text-indigo-400" />
+              <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em]">Gestión Multi-moneda</span>
+            </div>
+            <h1 className="text-3xl font-semibold tracking-tight">Movimientos</h1>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {/* 🔹 SELECTOR DE MONEDA PROFESIONAL */}
+            <div className="relative flex items-center bg-white/5 border border-white/10 rounded-xl px-3 py-2 transition-all focus-within:ring-1 focus-within:ring-white/20">
+              <Filter size={14} className="text-slate-500 mr-2" />
+              <select 
+                value={selectedCurrency}
+                onChange={(e) => setSelectedCurrency(e.target.value)}
+                className="bg-transparent text-sm font-medium outline-none cursor-pointer text-slate-200"
+              >
+                {availableCurrencies.map(curr => (
+                  <option key={curr} value={curr} className="bg-[#0E1629]">{curr}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="relative group">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-indigo-400" size={16} />
+              <input
+                type="text"
+                placeholder="Buscar..."
+                className="bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-white/20 w-[200px] transition-all"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            
+            <Link
+              href="/dashboard/finanzas/new"
+              className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2.5 rounded-xl text-sm font-medium transition-all shadow-lg"
+            >
+              <PlusCircle size={16} />
+              Nuevo
+            </Link>
+          </div>
         </div>
 
-        {/* LISTADO */}
-        <motion.div initial={{opacity:0}} animate={{opacity:1}} className="grid gap-4 max-w-5xl">
-          {movimientos.map(m => (
-            <div key={m.id} className="flex items-center justify-between p-6 rounded-2xl bg-[#111827]/60 border border-white/5 hover:border-indigo-500/30 transition-all">
-              <div className="flex items-center gap-5">
-                {m.categoria === "ingreso"
-                  ? <TrendingUp size={22} className="text-green-400"/>
-                  : <TrendingDown size={22} className="text-red-400"/>}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+          <KpiCard label="Ingresos" value={kpis.ingresos} color="text-emerald-400" icon={<TrendingUp size={24}/>} currency={selectedCurrency} />
+          <KpiCard label="Gastos" value={kpis.gastos} color="text-red-400" icon={<TrendingDown size={24}/>} currency={selectedCurrency} />
+          <KpiCard label="Balance" value={kpis.balance} color="text-white" icon={<Wallet size={24}/>} currency={selectedCurrency} />
+        </div>
 
+        {loading ? (
+          <div className="grid grid-cols-3 gap-8">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="h-64 rounded-[2rem] bg-white/5 animate-pulse border border-white/5" />
+            ))}
+          </div>
+        ) : filteredMovimientos.length === 0 ? (
+          <div className="rounded-[2rem] bg-white/5 border border-white/10 p-20 flex flex-col items-center text-center">
+            <Receipt size={32} className="text-slate-600 mb-4" />
+            <p className="text-slate-400 text-sm">No hay registros en {selectedCurrency}.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {filteredMovimientos.map((m) => (
+              <div key={m.id} className="group bg-[#0E1629]/50 backdrop-blur-xl border border-white/5 p-8 rounded-[2rem] hover:border-indigo-500/40 hover:bg-[#0E1629]/80 transition-all duration-300 flex flex-col justify-between h-72 shadow-xl shadow-black/10">
                 <div>
-                  <h2 className="text-lg font-semibold text-white">{m.nombre || "Sin nombre"}</h2>
-                  <p className="text-slate-400 text-xs">{m.descripcion}</p>
-                  <p className="text-white text-sm font-bold mt-1">${m.valor.toLocaleString()} {m.moneda}</p>
-                  <p className="text-[10px] text-slate-500 mt-1 flex items-center gap-1">
-                    <CalendarDays size={10}/> {m.fecha}
+                  <div className="flex justify-between items-start mb-8">
+                    <div className={`h-14 w-14 rounded-2xl flex items-center justify-center font-bold text-2xl border ${m.categoria === 'ingreso' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-red-500/10 border-red-500/20 text-red-400'}`}>
+                      {m.categoria === 'ingreso' ? <TrendingUp size={24}/> : <TrendingDown size={24}/>}
+                    </div>
+                    <button 
+                      onClick={() => { if(confirm("¿Eliminar?")) deleteDoc(doc(db, "finanzas", m.id)) }}
+                      className="text-slate-600 hover:text-red-400 transition-colors"
+                    >
+                      <ArrowUpRight size={20} />
+                    </button>
+                  </div>
+                  <h2 className="text-xl font-semibold text-white group-hover:text-indigo-300 transition-colors truncate">
+                    {m.nombre}
+                  </h2>
+                  <p className="text-slate-400 text-xs mt-1 truncate uppercase tracking-widest font-medium">
+                    {m.categoria}
+                  </p>
+                  <p className="text-2xl font-bold mt-4 text-white">
+                    ${Number(m.valor).toLocaleString()} <span className="text-xs text-slate-500">{m.moneda}</span>
                   </p>
                 </div>
+
+                <div className="pt-6 border-t border-white/5 flex items-center justify-between">
+                  <div>
+                    <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Fecha</p>
+                    <p className="text-[11px] text-slate-300 mt-0.5 flex items-center gap-1">
+                      <CalendarDays size={12}/> {m.fecha}
+                    </p>
+                  </div>
+                  <div className="px-3 py-1 rounded-full bg-white/5 border border-white/5 font-bold text-[10px] text-slate-400">
+                    {m.moneda}
+                  </div>
+                </div>
               </div>
-
-              <button onClick={() => handleDelete(m.id)} className="text-red-400 hover:text-red-300">
-                <Trash2 size={18}/>
-              </button>
-            </div>
-          ))}
-        </motion.div>
-
-        {movimientos.length === 0 && <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-6">No hay movimientos</p>}
+            ))}
+          </div>
+        )}
       </main>
     </div>
-
   );
 }
 
-/* ========== KPI FINANZAS ========== */
-function FinKpi({label, value, icon}:{label:string, value:string, icon:any}) {
+function SidebarLink({ href, label, active }: { href: string; label: string; active?: boolean }) {
   return (
-    <div className="flex items-center gap-2 bg-white/5 border border-white/5 rounded-xl p-4">
-      <div className="p-2 bg-black/20 rounded-lg text-indigo-400">{icon}</div>
-      <div>
-        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{label}</span>
-        <p className="text-white font-semibold text-sm truncate">{value}</p>
+    <Link
+      href={href}
+      className={`px-3 py-2.5 rounded-xl transition-all text-sm ${
+        active ? "bg-white/10 text-white font-medium" : "hover:bg-white/5 text-slate-400 hover:text-slate-200"
+      }`}
+    >
+      {label}
+    </Link>
+  );
+}
+
+function KpiCard({ label, value, color, icon, currency }: { label: string, value: number, color: string, icon: any, currency: string }) {
+  return (
+    <div className="bg-[#0E1629]/50 backdrop-blur-xl border border-white/5 p-8 rounded-[2rem] shadow-xl">
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">{label}</p>
+        <div className={`${color} opacity-40`}>{icon}</div>
       </div>
+      <p className={`text-3xl font-bold tracking-tight ${color}`}>
+        ${value.toLocaleString()} <span className="text-sm font-normal text-slate-500 uppercase">{currency}</span>
+      </p>
     </div>
   );
 }
