@@ -71,13 +71,10 @@ export default function CreateWorkspacePage() {
 
     setLoading(true);
     try {
-      // ✅ Crear workspace (en lib/workspace.ts)
+      // Crear workspace (en lib/workspace.ts)
       const workspaceId = await createWorkspace(trimmed, user.uid);
 
-      // 🟦 (por ahora) guardaremos el color después, en el siguiente paso
-      // para no mezclar cosas. En el paso siguiente lo actualizamos.
-
-      // ✅ Redirigir al dashboard
+      //  Redirigir al dashboard
       router.push("/dashboard");
     } catch (e: any) {
       console.error(e);
@@ -135,7 +132,7 @@ export default function CreateWorkspacePage() {
                 Consejo rápido
               </p>
               <p className="text-sm text-slate-600 mt-1">
-                Usa un nombre simple como <span className="font-medium">“Cebra Marketing”</span>{" "}
+                Usa un nombre simple como <span className="font-medium">“Empresa Marketing”</span>{" "}
                 o <span className="font-medium">“Equipo Contenidos”</span>.
               </p>
             </div>

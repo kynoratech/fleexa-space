@@ -1,4 +1,3 @@
-// lib/workspace.ts
 import {
   addDoc,
   collection,
@@ -9,6 +8,7 @@ import {
   setDoc,
   updateDoc,
   where,
+  arrayUnion,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
@@ -23,6 +23,8 @@ export interface InviteMemberParams {
   email: string;
   role: WorkspaceRole;
   invitedBy: string;
+  workspaceName?: string;
+  workspaceColor?: string;
 }
 
 export interface AcceptInviteParams {
@@ -30,33 +32,32 @@ export interface AcceptInviteParams {
   workspaceId: string;
   role: WorkspaceRole;
   uid: string;
-  invitedBy: string;
+  invitedBy?: string;
+  invitedEmail?: string;
 }
 
 /* =========================
    CREAR WORKSPACE
 ========================= */
 
-export async function createWorkspace(
-  name: string,
-  uid: string
-): Promise<string> {
-  const wsRef = await addDoc(collection(db, "workspaces"), {
+export async function createWorkspace(name: string, uid: string): Promise<string> {
+  const wsSnap = await addDoc(collection(db, "workspaces"), {
     name,
     ownerId: uid,
     createdBy: uid,
     createdAt: serverTimestamp(),
+    members: [],
   });
 
-  await setDoc(doc(db, "workspaceMembers", `${wsRef.id}_${uid}`), {
-    workspaceId: wsRef.id,
+  await setDoc(doc(db, "workspaceMembers", `${wsSnap.id}_${uid}`), {
+    workspaceId: wsSnap.id,
     userId: uid,
     role: "owner",
-    invitedBy: uid,
+    invitedBy: "system",
     joinedAt: serverTimestamp(),
   });
 
-  return wsRef.id;
+  return wsSnap.id;
 }
 
 /* =========================
@@ -71,18 +72,18 @@ export async function inviteMember(params: InviteMemberParams) {
     email,
     role: params.role,
     status: "pending",
-    invitedBy: params.invitedBy,
-    createdAt: serverTimestamp(),
+    invitedEmail: email,
+    invitedBy: params.invitedBy ?? "system",
+    workspaceName: params.workspaceName ?? null,
+    workspaceColor: params.workspaceColor ?? params.workspaceColor ?? "blue",
+    invitedAt: serverTimestamp(),
   });
 
   await addDoc(collection(db, "auditLogs"), {
     workspaceId: params.workspaceId,
     action: "INVITE_CREATED",
     actorId: params.invitedBy,
-    meta: {
-      email,
-      role: params.role,
-    },
+    meta: { email, role: params.role },
     createdAt: serverTimestamp(),
   });
 }
@@ -101,6 +102,7 @@ export async function getPendingInvitesByEmail(email: string) {
   const snap = await getDocs(q);
   return snap.docs.map((d) => ({
     id: d.id,
+    inviteId: d.id,
     ...d.data(),
   }));
 }
@@ -110,18 +112,26 @@ export async function getPendingInvitesByEmail(email: string) {
 ========================= */
 
 export async function acceptInvite(params: AcceptInviteParams) {
+  const invitedBySafe = params.invitedBy ?? "system";
+
+  const workspaceRef = doc(db, "workspaces", params.workspaceId);
+  await updateDoc(workspaceRef, {
+    members: arrayUnion(params.invitedEmail ?? params.uid),
+  });
+
   await setDoc(
     doc(db, "workspaceMembers", `${params.workspaceId}_${params.uid}`),
     {
       workspaceId: params.workspaceId,
       userId: params.uid,
       role: params.role,
-      invitedBy: params.invitedBy,
+      invitedBy: invitedBySafe,
+      invitedEmail: params.invitedEmail ?? null,
       joinedAt: serverTimestamp(),
     }
   );
 
-  await updateDoc(doc(db, "invitations", params.inviteId), {
+  await updateDoc(doc(db, "workspaceMembers", params.inviteId), {
     status: "accepted",
     acceptedBy: params.uid,
     acceptedAt: serverTimestamp(),
@@ -131,9 +141,7 @@ export async function acceptInvite(params: AcceptInviteParams) {
     workspaceId: params.workspaceId,
     action: "INVITE_ACCEPTED",
     actorId: params.uid,
-    meta: {
-      inviteId: params.inviteId,
-    },
+    meta: { inviteId: params.inviteId },
     createdAt: serverTimestamp(),
   });
 }

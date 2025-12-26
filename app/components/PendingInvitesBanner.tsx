@@ -1,4 +1,3 @@
-// app/components/PendingInvitesBanner.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -24,13 +23,21 @@ export default function PendingInvitesBanner() {
   async function handleAccept(invite: any) {
     if (!user) return;
 
-    await acceptInvite({
-      inviteId: invite.id,
-      workspaceId: invite.workspaceId,
-      role: invite.role,
-      uid: user.uid,
-      invitedBy: invite.invitedBy,
-    });
+    try {
+      await acceptInvite({
+        inviteId: invite.id,
+        workspaceId: invite.workspaceId ?? invite.workspaceId ?? "", // temporal safe
+        role: invite.role ?? "viewer", // fallback mínimo válido
+        uid: user.uid,
+        invitedBy: invite.invitedBy ?? "system", // NUNCA undefined
+        invitedEmail: invite.email, // ✔ este sí existe
+      });
+
+    } catch (error: any) {
+      console.error("Error aceptando invite:", error);
+      alert("No se pudo unir: " + error.message);
+      return;
+    }
 
     setInvites((prev) => prev.filter((i) => i.id !== invite.id));
   }
@@ -38,7 +45,7 @@ export default function PendingInvitesBanner() {
   return (
     <div className="mb-6 rounded-xl border border-sky-500/30 bg-sky-500/10 p-4">
       <h2 className="text-sm font-semibold text-sky-300 mb-2">
-        Invitaciones pendientes
+        Invitaciones pendientes ({invites.length})
       </h2>
 
       <div className="space-y-3">
@@ -48,7 +55,10 @@ export default function PendingInvitesBanner() {
             className="flex items-center justify-between gap-3"
           >
             <div className="text-sm text-slate-200">
-              Te invitaron a un equipo
+              Te invitaron al workspace{" "}
+              <span className="font-semibold text-white">
+                {invite.workspaceName ?? "Sin nombre"}
+              </span>
             </div>
 
             <button

@@ -67,8 +67,7 @@ export default function DashboardPage() {
           <SidebarLink href="/dashboard" label="Dashboard" active />
           <SidebarLink href="/dashboard/clientes" label="Clientes" />
           <SidebarLink href="/dashboard/proyectos" label="Proyectos" />
-          <SidebarLink href="/dashboard/tareas" label="Tareas" />
-          <SidebarLink href="/dashboard/presupuestos" label="Presupuestos" />
+          <SidebarLink href="/dashboard/finanzas" label="finanzas" />
         </nav>
 
         {/* User */}
