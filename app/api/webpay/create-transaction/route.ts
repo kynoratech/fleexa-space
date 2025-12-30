@@ -1,19 +1,29 @@
 import { WebpayPlus, Environment } from "transbank-sdk";
 
+export const dynamic = "force-dynamic";
+
 export async function POST(req: Request) {
   try {
+    const { billingCycle } = await req.json(); // ← recibir si es mensual o anual
+
+    if (!billingCycle) {
+      return Response.json({ ok: false, error: "Falta billingCycle" }, { status: 400 });
+    }
+
+    // Determinar monto según plan elegido
+    const amount = billingCycle === "yearly" ? 99900 : 9990; // ← $99.990 CLP en centavos
+
     const options = {
       commerceCode: "597055555532",
       apiKey: "579B532A7440BB0C9079DED94D31EA1615BACEB56610332264630D42D0A36B1C",
       integrationType: "TEST",
-      environment: Environment.Integration, // ← agregado y correcto
+      environment: Environment.Integration,
     };
 
     const tx = new WebpayPlus.Transaction(options);
 
     const buyOrder = "Fleexa_Order_" + Date.now().toString();
     const sessionId = "Fleexa_Session_" + Date.now().toString();
-    const amount = 9990;
     const returnUrl = "https://fleexa.space/checkout/retorno";
 
     const response = await tx.create(buyOrder, sessionId, amount, returnUrl);

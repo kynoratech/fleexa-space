@@ -4,9 +4,12 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ShieldCheck, CreditCard, ArrowLeft, Lock, Check, ArrowRight } from "lucide-react";
 import Link from "next/link";
-import { auth } from "@/lib/firebase"; // ← para obtener UID y guardarlo en localStorage
+import { auth } from "@/lib/firebase"; 
+import { onAuthStateChanged } from "firebase/auth";
+import { useRouter } from "next/navigation";
 
 export default function CheckoutPage() {
+  const router = useRouter();
   const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">("monthly");
 
   const prices = {
@@ -14,40 +17,44 @@ export default function CheckoutPage() {
     yearly: { amount: "99.900", label: "al año (ahorras $19.980)" }
   };
 
-  // --- LÓGICA DE PAGO WEBPAY (sin tocar UI) ---
+  // --- LÓGICA DE PAGO WEBPAY (mejorada, sin tocar UI) ---
   const handlePay = async () => {
     const user = auth.currentUser;
-    if (!user?.uid) {
-      console.error("No hay usuario autenticado");
-      return;
-    }
+    if (!user?.uid) return router.push("/login");
 
-    // Guardar UID para actualizar el plan después del pago
     localStorage.setItem("fleexa_uid", user.uid);
 
     try {
-      const res = await fetch("/api/webpay/create-transaction", { method: "POST" });
-      const data = await res.json();
+      const res = await fetch("/api/webpay/create-transaction", {
+        method: "POST",
+        body: JSON.stringify({ billingCycle }), // ← enviar el plan elegido
+        headers: { "Content-Type": "application/json" }
+      });
 
+      const data = await res.json();
       if (data.ok && data.paymentUrl) {
         window.location.href = data.paymentUrl;
-      } else {
-        console.error("Error Webpay:", data.error);
       }
     } catch (err) {
-      console.error("Fallo request Webpay:", err);
+      console.error(err);
     }
   };
 
+  // --- Si vuelve del login, continuar flujo automáticamente ---
+  onAuthStateChanged(auth, (usr) => {
+    if (usr && window.location.search.includes("redirect=%2Fcheckout")) {
+      router.push("/checkout");
+    }
+  });
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#fafafa] p-6 font-sans selection:bg-indigo-100">
-      <Link 
-        href="/" 
-        className="absolute top-8 left-8 flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors"
-      >
-        <ArrowLeft className="h-4 w-4" /> Volver
-      </Link>
-
+    <Link
+      href={typeof window !== "undefined" && document.referrer.includes("/dashboard") ? "/dashboard" : "/checkout"}
+      className="absolute top-8 left-8 flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors"
+    >
+      <ArrowLeft className="h-4 w-4" /> Volver
+    </Link>
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -116,7 +123,7 @@ export default function CheckoutPage() {
             </AnimatePresence>
           </div>
 
-          {/* BOTÓN Y SEGURIDAD (tu UI intacta, solo conectamos el pago) */}
+          {/* BOTÓN Y SEGURIDAD */}
           <div className="space-y-4">
             <div className="flex items-start gap-3 bg-indigo-50/50 p-4 rounded-2xl border border-indigo-100">
               <ShieldCheck className="h-5 w-5 text-indigo-600 shrink-0" />
@@ -126,7 +133,7 @@ export default function CheckoutPage() {
             </div>
 
             <motion.button 
-              onClick={handlePay} // ← conectado a Webpay
+              onClick={handlePay}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               className="w-full bg-slate-900 text-white py-4 rounded-2xl font-bold shadow-xl shadow-slate-200 hover:bg-slate-800 transition-all flex items-center justify-center gap-3 group"
@@ -142,6 +149,7 @@ export default function CheckoutPage() {
               </div>
             </div>
           </div>
+
         </div>
       </motion.div>
     </div>
