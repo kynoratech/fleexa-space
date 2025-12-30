@@ -1,8 +1,11 @@
 "use client";
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 
-import { useSearchParams, useRouter } from "next/navigation";
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+export const revalidate = 0;
+
+import { useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -29,12 +32,10 @@ export default function RetornoPago() {
         if (data.ok) {
           setStatus("success");
 
-          // 🔥 Actualizar plan a PRO en Firestore
-          const uid = localStorage.getItem("fleexa_uid"); // Lo guardaste al iniciar el pago
+          const uid = typeof window !== "undefined" ? localStorage.getItem("fleexa_uid") : null;
           if (uid) {
             await updateDoc(doc(db, "users", uid), { plan: "pro" });
           }
-
         } else {
           setStatus("failed");
         }
