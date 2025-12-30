@@ -14,7 +14,7 @@ export async function POST(req: Request) {
     const buyOrder = "Fleexa_Order_" + Date.now().toString();
     const sessionId = "Fleexa_Session_" + Date.now().toString();
     const amount = 9990;
-    const returnUrl = "https://fleexa.space/checkout/retorno";
+    const returnUrl = "https://www.fleexa.space/api/webpay/retorno";
 
     const response = await tx.create(buyOrder, sessionId, amount, returnUrl);
 
