@@ -1,7 +1,12 @@
 import type { NextConfig } from "next";
 
-const nextConfig: NextConfig = {
-  /* config options here */
+const config: NextConfig = {
+  output: "standalone",
+  reactStrictMode: true,
+
+  experimental: {
+    serverComponentsExternalPackages: ["transbank-sdk"],
+  },
 };
 
-export default nextConfig;
+export default config;
