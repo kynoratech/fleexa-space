@@ -39,7 +39,7 @@ export default function NewClientPage() {
     try {
       // Verificar plan del usuario
       const plan = await getUserPlan(user.uid);
-      
+
       // Contar clientes actuales
       const clientsQuery = query(
         collection(db, "users", user.uid, "clients")
@@ -48,7 +48,7 @@ export default function NewClientPage() {
       const clientCount = clientsSnap.size;
 
       // Validar límite de clientes según plan
-      if (!canAddClient(clientCount, plan)) {
+      if (!canAddClient(plan, clientCount)) {
         const message = getClientLimitMessage(plan);
         setError(message);
         setLoading(false);
