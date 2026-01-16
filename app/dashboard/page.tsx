@@ -22,6 +22,7 @@ import WeekTasks from "../components/Cards/WeekTasks";
 import UpcomingDeliveries from "../components/Cards/UpcomingDeliveries";
 import QuickStats from "../components/Cards/QuickStats";
 import ClientsPreview from "../components/Cards/ClientsPreview";
+import FinancesSummary from "../components/Cards/FinancesSummary";
 import { motion } from "framer-motion";
 import { PLAN_LIMITS } from "@/lib/plans";
 
@@ -296,6 +297,14 @@ export default function DashboardPage() {
                         description="Fechas importantes que no debes olvidar"
                       />
                       <UpcomingDeliveries />
+                    </GlassCard>
+
+                    <GlassCard>
+                      <CardHeader
+                        title="Finanzas"
+                        description="Resumen de ingresos y gastos"
+                      />
+                      <FinancesSummary />
                     </GlassCard>
                   </div>
 
