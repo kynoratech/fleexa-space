@@ -2,11 +2,13 @@
 
 import { useState, useEffect } from "react";
 import { auth, db } from "@/lib/firebase";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, getDocs, query } from "firebase/firestore";
 import { useRouter, usePathname } from "next/navigation";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import Link from "next/link";
 import { ArrowLeft, UserPlus, Save, LogOut, Loader2 } from "lucide-react";
+import { getUserPlan } from "@/lib/workspace";
+import { canAddClient, getClientLimitMessage } from "@/lib/plans";
 import WorkspaceTopBar from "../../../components/WorkspaceTopBar";
 
 export default function NewClientPage() {
@@ -14,6 +16,7 @@ export default function NewClientPage() {
   const pathname = usePathname();
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [nombre, setNombre] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -28,10 +31,30 @@ export default function NewClientPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
+    
     if (!nombre.trim() || !user) return;
 
     setLoading(true);
     try {
+      // Verificar plan del usuario
+      const plan = await getUserPlan(user.uid);
+      
+      // Contar clientes actuales
+      const clientsQuery = query(
+        collection(db, "users", user.uid, "clients")
+      );
+      const clientsSnap = await getDocs(clientsQuery);
+      const clientCount = clientsSnap.size;
+
+      // Validar límite de clientes según plan
+      if (!canAddClient(clientCount, plan)) {
+        const message = getClientLimitMessage(plan);
+        setError(message);
+        setLoading(false);
+        return;
+      }
+
       const docRef = await addDoc(
         collection(db, "users", user.uid, "clients"),
         {
@@ -47,7 +70,7 @@ export default function NewClientPage() {
       router.push(`/dashboard/clientes/${docRef.id}`);
     } catch (err) {
       console.error(err);
-      alert("Error al crear el registro.");
+      setError("Error al crear el registro.");
     } finally {
       setLoading(false);
     }
@@ -116,6 +139,12 @@ export default function NewClientPage() {
 
           {/* FORMULARIO ESTILO GLASS */}
           <form onSubmit={handleSubmit} className="space-y-8 bg-white/5 backdrop-blur-xl border border-white/10 p-10 rounded-[2rem] shadow-2xl">
+            
+            {error && (
+              <div className="bg-rose-500/10 border border-rose-500/30 rounded-lg p-4 text-rose-300 text-sm">
+                ⚠️ {error}
+              </div>
+            )}
             
             <div className="space-y-2">
               <label className="text-[11px] font-bold uppercase tracking-[0.1em] text-slate-400 ml-1">

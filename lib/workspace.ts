@@ -3,12 +3,13 @@ import {
   collection,
   doc,
   getDocs,
-  query,
-  serverTimestamp,
+  getDoc,
   setDoc,
+  query,
   updateDoc,
   where,
   arrayUnion,
+  serverTimestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
@@ -144,4 +145,44 @@ export async function acceptInvite(params: AcceptInviteParams) {
     meta: { inviteId: params.inviteId },
     createdAt: serverTimestamp(),
   });
+}
+
+/* =========================
+   OBTENER PLAN Y CONTEOS
+========================= */
+
+export async function getUserPlan(uid: string): Promise<"free" | "pro"> {
+  try {
+    const userRef = doc(db, "users", uid);
+    const userSnap = await getDoc(userRef);
+    
+    if (userSnap.exists()) {
+      return userSnap.data().plan ?? "free";
+    } else {
+      // Crear documento de usuario si no existe
+      console.log("📝 Creando documento de usuario:", uid);
+      await setDoc(userRef, {
+        plan: "free",
+        createdAt: serverTimestamp(),
+      }, { merge: true });
+      return "free";
+    }
+  } catch (err) {
+    console.error("Error getting user plan:", err);
+  }
+  return "free";
+}
+
+export async function getUserWorkspaceCount(uid: string): Promise<number> {
+  try {
+    const memberQuery = query(
+      collection(db, "workspaceMembers"),
+      where("userId", "==", uid)
+    );
+    const memberSnap = await getDocs(memberQuery);
+    return memberSnap.size;
+  } catch (err) {
+    console.error("Error counting workspaces:", err);
+    return 0;
+  }
 }

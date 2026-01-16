@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
-import { createWorkspace } from "@/lib/workspace";
+import { createWorkspace, getUserWorkspaceCount } from "@/lib/workspace";
+import { getUserPlan, canCreateWorkspace, getWorkspaceLimitMessage } from "@/lib/plans";
 
 type ColorOption = {
   key: string;
@@ -71,6 +72,20 @@ export default function CreateWorkspacePage() {
 
     setLoading(true);
     try {
+      // Verificar plan del usuario
+      const plan = await getUserPlan(user.uid);
+      
+      // Contar workspaces actuales
+      const currentCount = await getUserWorkspaceCount(user.uid);
+      
+      // Validar límite de workspaces según plan
+      if (!canCreateWorkspace(currentCount, plan)) {
+        const message = getWorkspaceLimitMessage(plan);
+        setError(message);
+        setLoading(false);
+        return;
+      }
+      
       // Crear workspace (en lib/workspace.ts)
       const workspaceId = await createWorkspace(trimmed, user.uid);
 

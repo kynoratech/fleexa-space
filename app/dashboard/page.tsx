@@ -28,6 +28,7 @@ import { PLAN_LIMITS } from "@/lib/plans";
 export default function DashboardPage() {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
   const { workspace, loading: loadingWorkspace } = useActiveWorkspace();
   const limits = PLAN_LIMITS[workspace?.plan === "pro" ? "pro" : "free"];
 
@@ -88,10 +89,19 @@ export default function DashboardPage() {
           });
           const data = await res.json();
 
-          if (data.ok) {
+          if (data.ok && data.isSuccessful) {
             const uid = localStorage.getItem("fleexa_uid");
             if (uid) {
               await updateDoc(doc(db, "users", uid), { plan: "pro" });
+              console.log("✅ Plan actualizado a PRO");
+              
+              // Remover token de URL
+              window.history.replaceState({}, document.title, window.location.pathname);
+              
+              // Forzar refetch del workspace después de 1 segundo
+              setTimeout(() => {
+                setRefreshKey(prev => prev + 1);
+              }, 1000);
             }
           }
         } catch (err) {

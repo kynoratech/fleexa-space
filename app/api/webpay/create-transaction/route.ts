@@ -24,7 +24,10 @@ export async function POST(req: Request) {
 
     const buyOrder = "Fleexa_Order_" + Date.now().toString();
     const sessionId = "Fleexa_Session_" + Date.now().toString();
-    const returnUrl = "https://fleexa.space/checkout/retorno";
+    // Obtener el host dinámicamente del request
+    const host = req.headers.get('host') || 'localhost:3000';
+    const protocol = req.headers.get('x-forwarded-proto') || 'http';
+    const returnUrl = `${protocol}://${host}/checkout/retorno`;
 
     const response = await tx.create(buyOrder, sessionId, amount, returnUrl);
 
