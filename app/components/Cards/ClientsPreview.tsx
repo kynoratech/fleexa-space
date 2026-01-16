@@ -20,15 +20,18 @@ type Client = {
 
 export default function ClientsPreview() {
   const [clients, setClients] = useState<Client[]>([]);
+  const [totalClients, setTotalClients] = useState<number>(0);
 
   useEffect(() => {
     const user = auth.currentUser;
     if (!user) return;
 
+    // Consulta para los 3 clientes más recientes
     const ref = collection(db, "users", user.uid, "clients");
-    const q = query(ref, orderBy("createdAt", "desc"), limit(5));
+    const q = query(ref, orderBy("createdAt", "desc"), limit(3));
 
-    const unsub = onSnapshot(q, (snap) => {
+    // Consulta para contar el total de clientes
+    const unsubClients = onSnapshot(q, (snap) => {
       const list: Client[] = snap.docs.map((d) => ({
         id: d.id,
         ...(d.data() as any),
@@ -36,7 +39,14 @@ export default function ClientsPreview() {
       setClients(list);
     });
 
-    return unsub;
+    const unsubTotal = onSnapshot(ref, (snap) => {
+      setTotalClients(snap.size);
+    });
+
+    return () => {
+      unsubClients();
+      unsubTotal();
+    };
   }, []);
 
   return (
@@ -80,7 +90,6 @@ export default function ClientsPreview() {
                   <div className="h-8 w-8 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 font-bold text-[10px] shrink-0 group-hover:bg-indigo-500 group-hover:text-white transition-all">
                     {c.nombre ? c.nombre.charAt(0).toUpperCase() : <User size={12} />}
                   </div>
-                  
                   <div className="min-w-0">
                     <p className="text-[13px] font-bold text-slate-200 truncate tracking-tight">
                       {c.nombre || "Sin nombre"}
@@ -90,23 +99,25 @@ export default function ClientsPreview() {
                     </p>
                   </div>
                 </div>
-
                 <ChevronRight size={14} className="text-slate-600 group-hover:text-white group-hover:translate-x-1 transition-all" />
               </Link>
             ))}
+            {/* Mostrar enlace 'ver más' si hay más de 3 clientes */}
+            {totalClients > 3 && (
+              <div className="flex justify-center mt-2">
+                <Link
+                  href="/dashboard/clientes"
+                  className="text-xs text-indigo-400 hover:underline font-semibold"
+                >
+                  Ver más
+                </Link>
+              </div>
+            )}
           </div>
         )}
       </div>
 
-      {/* Footer Link */}
-      <div className="mt-6 pt-4 border-t border-white/5">
-        <Link
-          href="/dashboard/clientes"
-          className="flex items-center justify-center gap-2 w-full py-2 text-[11px] font-black uppercase tracking-widest text-slate-500 hover:text-indigo-400 transition-colors"
-        >
-          Ver Directorio Completo
-        </Link>
-      </div>
+      {/* Footer Link (opcional: puedes dejarlo o quitarlo si solo quieres el 'ver más') */}
     </div>
   );
 }
