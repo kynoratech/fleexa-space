@@ -10,19 +10,24 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "dotenv": "^17.2.3",
+    "drizzle-orm": "^0.45.1",
     "firebase": "^12.6.0",
     "framer-motion": "^12.23.25",
     "lucide-react": "^0.561.0",
     "next": "^16.0.7",
+    "postgres": "^3.4.4",
     "react": "19.2.0",
     "react-dom": "19.2.0",
-    "transbank-sdk": "^6.1.1"
+    "transbank-sdk": "^6.1.1",
+    "zod": "^3.22.4"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "drizzle-kit": "^0.31.8",
     "eslint": "^9",
     "eslint-config-next": "16.0.6",
     "tailwindcss": "^4",
