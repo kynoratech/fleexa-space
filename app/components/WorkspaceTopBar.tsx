@@ -5,6 +5,10 @@ import { ChevronDown, Users, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useActiveWorkspace } from "@/lib/useActiveWorkspace";
 import InviteButton from "../components/invitations/InviteButton";
+<<<<<<< HEAD
+=======
+import WorkspaceSwitcher from "./workspaces/WorkspaceSwitcher";
+>>>>>>> main
 
 export default function WorkspaceTopBar() {
   const { workspace, loading } = useActiveWorkspace();
@@ -41,7 +45,10 @@ export default function WorkspaceTopBar() {
     <>
       {/* TOP BAR (igual a la original, solo que el botón ahora abre modal) */}
       <div className="mb-10 border-b border-slate-200 pb-5 flex items-start justify-between">
+<<<<<<< HEAD
 
+=======
+>>>>>>> main
         {/* LEFT */}
         <div className="flex items-start gap-3">
           <span
@@ -51,11 +58,16 @@ export default function WorkspaceTopBar() {
             }}
           />
           <div>
+<<<<<<< HEAD
             <button className="flex items-center gap-1 text-xl font-semibold tracking-tight">
               {workspace.name}
               <ChevronDown size={18} className="text-slate-500" />
             </button>
 
+=======
+            {/* Dropdown de workspaces */}
+            <WorkspaceSwitcher />
+>>>>>>> main
             <p className="text-sm text-slate-500 mt-1">
               Rol:{" "}
               <span className="font-medium text-slate-700 capitalize">

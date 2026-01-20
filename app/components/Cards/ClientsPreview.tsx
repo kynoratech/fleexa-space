@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useActiveWorkspace } from "@/lib/useActiveWorkspace";
 import { auth, db } from "@/lib/firebase";
 import {
   collection,
@@ -19,6 +20,7 @@ type Client = {
 };
 
 export default function ClientsPreview() {
+  const { workspace } = useActiveWorkspace();
   const [clients, setClients] = useState<Client[]>([]);
   const [totalClients, setTotalClients] = useState<number>(0);
 
@@ -70,6 +72,11 @@ export default function ClientsPreview() {
       </div>
 
       {/* Lista de clientes */}
+      {workspace?.plan === "free" && totalClients > 3 && (
+        <div className="mb-2 p-2 rounded-lg bg-yellow-900/40 border border-yellow-400/30 text-xs text-yellow-200 text-center">
+          Solo puedes visualizar los 3 clientes más recientes con el plan Free. Actualiza a Pro para ver todos tus clientes.
+        </div>
+      )}
       <div className="flex-1 space-y-2">
         {clients.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 px-4 rounded-2xl border border-dashed border-white/5 bg-white/[0.01]">

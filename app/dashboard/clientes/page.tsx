@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useActiveWorkspace } from "@/lib/useActiveWorkspace";
 import { auth, db } from "@/lib/firebase";
 import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
 import { onAuthStateChanged, signOut } from "firebase/auth";
@@ -20,6 +21,7 @@ type Client = {
 };
 
 export default function ClientsPage() {
+  const { workspace } = useActiveWorkspace();
   const router = useRouter();
   const pathname = usePathname();
   const [user, setUser] = useState<any>(null);
@@ -55,10 +57,15 @@ export default function ClientsPage() {
 
   const filteredClients = useMemo(() => {
     const term = search.toLowerCase();
-    return clients.filter(c => 
+    let filtered = clients.filter(c => 
       c.nombre?.toLowerCase().includes(term) || c.email?.toLowerCase().includes(term)
     );
-  }, [clients, search]);
+    // Si el plan es free, solo mostrar los primeros 3
+    if (workspace?.plan === "free") {
+      filtered = filtered.slice(0, 3);
+    }
+    return filtered;
+  }, [clients, search, workspace]);
 
   if (!user) return null;
 
@@ -133,6 +140,17 @@ export default function ClientsPage() {
           </div>
         </div>
 
+        {/* AVISO PLAN FREE */}
+        {workspace?.plan === "free" && clients.length > 3 && (
+          <div className="mb-4 p-3 rounded-lg bg-yellow-900/40 border border-yellow-400/30 text-xs text-yellow-200 text-center">
+            Solo puedes editar los 3 clientes más recientes con el plan Free. Los demás están bloqueados.
+          </div>
+        )}
+
+        {/* Mostrar cantidad total de clientes */}
+        <div className="mb-4 text-xs text-slate-400 text-right">
+          Total de clientes: <span className="font-bold text-slate-200">{clients.length}</span>
+        </div>
         {/* LISTADO */}
         {loading ? (
           <div className="grid grid-cols-3 gap-8">
@@ -147,36 +165,42 @@ export default function ClientsPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {filteredClients.map((c) => {
+            {clients.map((c, idx) => {
               const isOwner = user.email === c.createdByEmail;
-              return (
-                <Link key={c.id} href={`/dashboard/clientes/${c.id}`}>
-                  <div className="group bg-[#0E1629]/50 backdrop-blur-xl border border-white/5 p-8 rounded-[2rem] hover:border-indigo-500/40 hover:bg-[#0E1629]/80 transition-all duration-300 flex flex-col justify-between h-72 shadow-xl shadow-black/10">
-                    <div>
-                      <div className="flex justify-between items-start mb-10">
-                        <div className="h-14 w-14 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 font-bold text-2xl">
-                          {c.nombre.charAt(0)}
-                        </div>
-                        <ArrowUpRight className="text-slate-600 group-hover:text-white transition-colors" size={20} />
+              const isBlocked = workspace?.plan === "free" && idx >= 3;
+              const cardContent = (
+                <div className={`group bg-[#0E1629]/50 backdrop-blur-xl border border-white/5 p-8 rounded-[2rem] ${!isBlocked ? 'hover:border-indigo-500/40 hover:bg-[#0E1629]/80' : 'opacity-60 grayscale'} transition-all duration-300 flex flex-col justify-between h-72 shadow-xl shadow-black/10`}>
+                  <div>
+                    <div className="flex justify-between items-start mb-10">
+                      <div className="h-14 w-14 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 font-bold text-2xl">
+                        {c.nombre.charAt(0)}
                       </div>
-                      <h2 className="text-xl font-semibold text-white group-hover:text-indigo-300 transition-colors truncate">
-                        {c.nombre}
-                      </h2>
-                      <p className="text-slate-400 text-xs mt-1 truncate">{c.email || "SIN EMAIL"}</p>
+                      <ArrowUpRight className={`text-slate-600 ${!isBlocked ? 'group-hover:text-white' : ''} transition-colors`} size={20} />
                     </div>
-
-                    <div className="pt-6 border-t border-white/5 flex items-center justify-between">
-                      <div>
-                        <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Creado</p>
-                        <p className="text-[11px] text-slate-300 mt-0.5">{formatDate(c.createdAt)}</p>
-                      </div>
-                      <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/5 border border-white/5">
-                        {isOwner && <ShieldCheck size={10} className="text-indigo-400" />}
-                        <span className="text-[10px] font-bold text-slate-400">{isOwner ? "PROPIO" : "EQUIPO"}</span>
-                      </div>
+                    <h2 className="text-xl font-semibold text-white group-hover:text-indigo-300 transition-colors truncate">
+                      {c.nombre}
+                    </h2>
+                    <p className="text-slate-400 text-xs mt-1 truncate">{c.email || "SIN EMAIL"}</p>
+                  </div>
+                  <div className="pt-6 border-t border-white/5 flex items-center justify-between">
+                    <div>
+                      <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Creado</p>
+                      <p className="text-[11px] text-slate-300 mt-0.5">{formatDate(c.createdAt)}</p>
+                    </div>
+                    <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/5 border border-white/5">
+                      {isOwner && <ShieldCheck size={10} className="text-indigo-400" />}
+                      <span className="text-[10px] font-bold text-slate-400">{isOwner ? "PROPIO" : "EQUIPO"}</span>
                     </div>
                   </div>
-                </Link>
+                  {isBlocked && (
+                    <div className="absolute top-4 right-4 bg-yellow-900/80 border border-yellow-400/40 text-yellow-200 text-[10px] px-2 py-1 rounded-lg pointer-events-none select-none">Bloqueado</div>
+                  )}
+                </div>
+              );
+              return isBlocked ? (
+                <div key={c.id} className="relative">{cardContent}</div>
+              ) : (
+                <Link key={c.id} href={`/dashboard/clientes/${c.id}`}>{cardContent}</Link>
               );
             })}
           </div>

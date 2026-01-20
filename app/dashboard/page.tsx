@@ -10,6 +10,18 @@ import Link from "next/link";
 import { collection, doc, getDocs, updateDoc } from "firebase/firestore";
 import { CheckCircle, XCircle, ArrowRight } from "lucide-react";
 
+// Función para cancelar suscripción (cambiar plan a 'free')
+async function cancelSubscription(uid: string, onSuccess?: () => void) {
+  try {
+    const userRef = doc(db, "users", uid);
+    await updateDoc(userRef, { plan: "free" });
+    if (onSuccess) onSuccess();
+  } catch (err) {
+    alert("Error al cancelar la suscripción");
+    console.error(err);
+  }
+}
+
 /* 🔹 WORKSPACE */
 import WorkspaceTopBar from "../components/WorkspaceTopBar";
 import { useActiveWorkspace } from "@/lib/useActiveWorkspace";
@@ -226,6 +238,20 @@ export default function DashboardPage() {
                       <span className="inline-flex items-center gap-2">
                         <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_0_5px_rgba(16,185,129,0.12)]" />
                         <span className="font-semibold">Plan Pro activo</span>
+                        <button
+                          title="Cancelar suscripción"
+                          className="ml-2 text-slate-400 hover:text-red-500 transition-colors"
+                          style={{ lineHeight: 1 }}
+                          onClick={() => {
+                            if (user?.uid) {
+                              if (confirm('¿Seguro que deseas cancelar tu suscripción Pro?')) {
+                                cancelSubscription(user.uid);
+                              }
+                            }
+                          }}
+                        >
+                          <XCircle className="w-4 h-4" />
+                        </button>
                       </span>
                     </>
                   ) : (
