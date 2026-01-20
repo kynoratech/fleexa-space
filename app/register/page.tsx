@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import { createUserWithEmailAndPassword } from "firebase/auth";
-import { auth, db } from "@/lib/firebase";
-import { doc, setDoc } from "firebase/firestore";
+import { auth } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
 import { useGoogleSignIn } from "@/actions/googleSignIn";
+import { syncUserToNeon } from "@/actions/neonOperations";
+import { syncUserToFirestore } from "@/actions/firestoreOperations";
 import { motion } from "framer-motion";
 import PasswordInput from "@/app/components/ui/PasswordInput";
 import { ArrowLeft, Loader2, Mail, UserPlus, Sparkles } from "lucide-react";
@@ -28,17 +29,21 @@ export default function RegisterPage() {
       const userCred = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCred.user;
 
-      await setDoc(doc(db, "users", user.uid), {
-        uid: user.uid,
-        email,
-        provider: "email",
-        createdAt: new Date(),
-      });
+      // Sincronizar usuario a Neon y Firestore en paralelo
+      const syncResults = await Promise.all([
+        syncUserToNeon(user.uid, email),
+        syncUserToFirestore(user.uid, email),
+      ]);
+
+      // Verificar que la sincronización a Neon fue exitosa
+      if (!syncResults[0]) {
+        throw new Error("No se pudo sincronizar el usuario con la base de datos. Intenta nuevamente.");
+      }
 
       router.push("/dashboard");
     } catch (err: any) {
       console.error(err);
-      setError("No pudimos crear la cuenta. Verifica tus datos.");
+      setError(err.message || "No pudimos crear la cuenta. Verifica tus datos.");
     } finally {
       setLoading(false);
     }

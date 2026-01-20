@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { auth, db } from "@/lib/firebase";
-import { collection, addDoc, serverTimestamp, getDocs, query } from "firebase/firestore";
+import { auth } from "@/lib/firebase";
 import { useRouter, usePathname } from "next/navigation";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import Link from "next/link";
@@ -10,6 +9,8 @@ import { ArrowLeft, UserPlus, Save, LogOut, Loader2 } from "lucide-react";
 import { getUserPlan } from "@/lib/workspace";
 import { canAddClient, getClientLimitMessage } from "@/lib/plans";
 import WorkspaceTopBar from "../../../components/WorkspaceTopBar";
+import { getUserByFirebaseUid, getWorkspaceClientsFromNeon, createClientInNeon } from "@/actions/neonOperations";
+import { createClientInFirestore } from "@/actions/firestoreOperations";
 
 export default function NewClientPage() {
   const router = useRouter();
@@ -20,11 +21,23 @@ export default function NewClientPage() {
   const [nombre, setNombre] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [workspaceId, setWorkspaceId] = useState<number | null>(null);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (usr) => {
-      if (!usr) router.push("/login");
-      else setUser(usr);
+    const unsub = onAuthStateChanged(auth, async (usr) => {
+      if (!usr) {
+        router.push("/login");
+        return;
+      }
+      setUser(usr);
+      
+      // Obtener el usuario de Neon y su workspace
+      const neonUser = await getUserByFirebaseUid(usr.uid);
+      if (neonUser) {
+        // TODO: obtener el workspace activo (por ahora usar el primero)
+        // Por ahora asumimos que tienen al menos un workspace
+        setWorkspaceId(1); // Esto debería venir del contexto del workspace
+      }
     });
     return () => unsub();
   }, [router]);
@@ -33,19 +46,16 @@ export default function NewClientPage() {
     e.preventDefault();
     setError(null);
     
-    if (!nombre.trim() || !user) return;
+    if (!nombre.trim() || !user || !workspaceId) return;
 
     setLoading(true);
     try {
       // Verificar plan del usuario
       const plan = await getUserPlan(user.uid);
 
-      // Contar clientes actuales
-      const clientsQuery = query(
-        collection(db, "users", user.uid, "clients")
-      );
-      const clientsSnap = await getDocs(clientsQuery);
-      const clientCount = clientsSnap.size;
+      // Contar clientes actuales en Neon
+      const currentClients = await getWorkspaceClientsFromNeon(workspaceId);
+      const clientCount = currentClients.length;
 
       // Validar límite de clientes según plan
       if (!canAddClient(plan, clientCount)) {
@@ -55,19 +65,24 @@ export default function NewClientPage() {
         return;
       }
 
-      const docRef = await addDoc(
-        collection(db, "users", user.uid, "clients"),
-        {
-          nombre: nombre.trim(),
-          email: email.trim() || null,
-          phone: phone.trim() || null,
-          createdAt: serverTimestamp(),
-          createdByUid: user.uid,
-          createdByEmail: user.email ?? null,
-          createdByName: user.displayName ?? null,
-        }
+      // Crear cliente en Neon y Firestore en paralelo
+      const newClient = await createClientInNeon(
+        workspaceId,
+        nombre.trim(),
+        email.trim() || undefined,
+        phone.trim() || undefined
       );
-      router.push(`/dashboard/clientes/${docRef.id}`);
+
+      // Guardar en Firestore también
+      await createClientInFirestore(
+        user.uid,
+        nombre.trim(),
+        email.trim() || undefined,
+        phone.trim() || undefined,
+        newClient.id
+      );
+      
+      router.push(`/dashboard/clientes/${newClient.id}`);
     } catch (err) {
       console.error(err);
       setError("Error al crear el registro.");

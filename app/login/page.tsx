@@ -5,6 +5,8 @@ import { signInWithEmailAndPassword } from "firebase/auth";
 import { useGoogleSignIn } from "@/actions/googleSignIn";
 import { auth } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
+import { syncUserToNeon } from "@/actions/neonOperations";
+import { syncUserToFirestore } from "@/actions/firestoreOperations";
 import { motion } from "framer-motion";
 import PasswordInput from "@/app/components/ui/PasswordInput";
 import { ArrowLeft, Loader2, Mail } from "lucide-react";
@@ -32,7 +34,15 @@ export default function LoginPage() {
     setLoadingEmail(true);
 
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      const userCred = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCred.user;
+
+      // Sincronizar usuario a Neon y Firestore en paralelo
+      await Promise.all([
+        syncUserToNeon(user.uid, user.email || email, user.displayName || undefined),
+        syncUserToFirestore(user.uid, user.email || email, user.displayName || undefined),
+      ]);
+
       router.push("/dashboard");
     } catch (err: any) {
       console.error(err);

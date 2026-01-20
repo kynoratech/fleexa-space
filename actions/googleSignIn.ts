@@ -1,9 +1,10 @@
 "use client";
 
-import { auth, db } from "@/lib/firebase";
+import { auth } from "@/lib/firebase";
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
-import { doc, getDoc, setDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
+import { syncUserToNeon } from "@/actions/neonOperations";
+import { syncUserToFirestore } from "@/actions/firestoreOperations";
 
 export function useGoogleSignIn() {
   const router = useRouter();
@@ -16,9 +17,6 @@ export function useGoogleSignIn() {
 
       if (!user) return;
 
-      const userRef = doc(db, "users", user.uid);
-      const userSnap = await getDoc(userRef);
-
       // -----------------------------------------------------------------
       // 🔐 1. Seguridad: Evitar cuentas Google sin email (sí pasa a veces)
       // -----------------------------------------------------------------
@@ -30,31 +28,15 @@ export function useGoogleSignIn() {
       const googleEmail = user.email.toLowerCase();
 
       // -----------------------------------------------------------------
-      // 🛡 2. Usuario nuevo → se registra
+      // 🚀 2. Sincronizar usuario a Neon y Firestore en paralelo
       // -----------------------------------------------------------------
-      if (!userSnap.exists()) {
-        await setDoc(userRef, {
-          uid: user.uid,
-          name: user.displayName || "",
-          email: googleEmail,
-          avatar: user.photoURL || "",
-          provider: "google",
-          createdAt: new Date(),
-        });
-      } else {
-        // -----------------------------------------------------------------
-        // 🚨 3. Usuario existente → Validación anti-hijacking
-        // -----------------------------------------------------------------
-        const existing = userSnap.data();
-
-        if (existing.email !== googleEmail) {
-          console.error("⚠️ Intento sospechoso: email distinto al original.");
-          return;
-        }
-      }
+      await Promise.all([
+        syncUserToNeon(user.uid, googleEmail, user.displayName || undefined),
+        syncUserToFirestore(user.uid, googleEmail, user.displayName || undefined),
+      ]);
 
       // -----------------------------------------------------------------
-      // 🚀 Login seguro → llevar al dashboard
+      // 🚀 3. Login seguro → llevar al dashboard
       // -----------------------------------------------------------------
       router.push("/dashboard");
 

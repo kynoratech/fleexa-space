@@ -4,8 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
-import { createWorkspace, getUserWorkspaceCount } from "@/lib/workspace";
-import { getUserPlan, canCreateWorkspace, getWorkspaceLimitMessage } from "@/lib/plans";
+import { createWorkspace, getUserWorkspaceCount, getUserPlan } from "@/lib/workspace";
+import { canCreateWorkspace, getWorkspaceLimitMessage } from "@/lib/plans";
+import { getUserByFirebaseUid, createWorkspaceInNeon } from "@/actions/neonOperations";
+import { createWorkspaceInFirestore } from "@/actions/firestoreOperations";
 
 type ColorOption = {
   key: string;
@@ -72,11 +74,20 @@ export default function CreateWorkspacePage() {
 
     setLoading(true);
     try {
+      // Obtener el usuario de Neon
+      const neonUser = await getUserByFirebaseUid(user.uid);
+      if (!neonUser) {
+        setError("No pudimos encontrar tu usuario. Intenta cerrar sesión y volver a entrar.");
+        setLoading(false);
+        return;
+      }
+
       // Verificar plan del usuario
       const plan = await getUserPlan(user.uid);
       
-      // Contar workspaces actuales
-      const currentCount = await getUserWorkspaceCount(user.uid);
+      // TODO: Contar workspaces actuales desde Neon
+      // Por ahora asumimos que pueden crear (esto debería consultarse en Neon)
+      const currentCount = 0;
       
       // Validar límite de workspaces según plan
       if (!canCreateWorkspace(currentCount, plan)) {
@@ -86,8 +97,11 @@ export default function CreateWorkspacePage() {
         return;
       }
       
-      // Crear workspace (en lib/workspace.ts)
-      const workspaceId = await createWorkspace(trimmed, user.uid);
+      // Crear workspace en Neon y Firestore en paralelo
+      const workspace = await createWorkspaceInNeon(neonUser.id, trimmed, trimmed);
+      
+      // Guardar en Firestore también
+      await createWorkspaceInFirestore(user.uid, trimmed, workspace.id);
 
       //  Redirigir al dashboard
       router.push("/dashboard");

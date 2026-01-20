@@ -6,6 +6,7 @@ export const PLAN_LIMITS = {
     canInvite: false,
     canUseAI: false,
     maxExportsPerMonth: 2,
+    maxWorkspaces: 4,
   },
   pro: {
     maxClients: Infinity,
@@ -14,6 +15,7 @@ export const PLAN_LIMITS = {
     canInvite: true,
     canUseAI: true,
     maxExportsPerMonth: Infinity,
+    maxWorkspaces: Infinity,
   }
 };
 
@@ -38,4 +40,26 @@ export function getClientLimitMessage(plan: keyof typeof PLAN_LIMITS): string {
   const max = PLAN_LIMITS[plan]?.maxClients;
   if (max === Infinity) return "Puedes agregar clientes ilimitados con tu plan actual.";
   return `Puedes agregar hasta ${max} clientes con tu plan actual.`;
+}
+
+/**
+ * Verifica si el usuario puede crear un workspace según su plan y cantidad actual de workspaces.
+ * @param {number} currentWorkspaces - Cantidad actual de workspaces.
+ * @param {string} plan - Nombre del plan ("free" | "pro").
+ * @returns {boolean}
+ */
+export function canCreateWorkspace(currentWorkspaces: number, plan: keyof typeof PLAN_LIMITS): boolean {
+  const max = PLAN_LIMITS[plan]?.maxWorkspaces ?? 0;
+  return currentWorkspaces < max;
+}
+
+/**
+ * Devuelve un mensaje sobre el límite de workspaces según el plan.
+ * @param {string} plan - Nombre del plan ("free" | "pro").
+ * @returns {string}
+ */
+export function getWorkspaceLimitMessage(plan: keyof typeof PLAN_LIMITS): string {
+  const max = PLAN_LIMITS[plan]?.maxWorkspaces;
+  if (max === Infinity) return "Puedes crear workspaces ilimitados con tu plan actual.";
+  return `Puedes crear hasta ${max} workspaces con tu plan actual.`;
 }
