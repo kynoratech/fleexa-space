@@ -1,14 +1,11 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import { ChevronDown, Users, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useActiveWorkspace } from "@/lib/useActiveWorkspace";
 import InviteButton from "../components/invitations/InviteButton";
-<<<<<<< HEAD
-=======
 import WorkspaceSwitcher from "./workspaces/WorkspaceSwitcher";
->>>>>>> main
 
 export default function WorkspaceTopBar() {
   const { workspace, loading } = useActiveWorkspace();
@@ -16,7 +13,7 @@ export default function WorkspaceTopBar() {
 
   if (loading) return null;
 
-  // SIN WORKSPACE → Onboarding (igual que antes)
+  // SIN WORKSPACE ÔåÆ Onboarding (igual que antes)
   if (!workspace) {
     return (
       <div className="mb-10 rounded-2xl border border-slate-200 bg-slate-50 px-6 py-5 flex items-center justify-between">
@@ -43,12 +40,8 @@ export default function WorkspaceTopBar() {
 
   return (
     <>
-      {/* TOP BAR (igual a la original, solo que el botón ahora abre modal) */}
+      {/* TOP BAR (igual a la original, solo que el bot├│n ahora abre modal) */}
       <div className="mb-10 border-b border-slate-200 pb-5 flex items-start justify-between">
-<<<<<<< HEAD
-
-=======
->>>>>>> main
         {/* LEFT */}
         <div className="flex items-start gap-3">
           <span
@@ -58,22 +51,14 @@ export default function WorkspaceTopBar() {
             }}
           />
           <div>
-<<<<<<< HEAD
-            <button className="flex items-center gap-1 text-xl font-semibold tracking-tight">
-              {workspace.name}
-              <ChevronDown size={18} className="text-slate-500" />
-            </button>
-
-=======
             {/* Dropdown de workspaces */}
             <WorkspaceSwitcher />
->>>>>>> main
             <p className="text-sm text-slate-500 mt-1">
               Rol:{" "}
               <span className="font-medium text-slate-700 capitalize">
                 {workspace.role}
               </span>{" "}
-              ·{" "}
+              ┬À{" "}
               {workspace.role === "viewer"
                 ? "Solo puedes ver el contenido"
                 : "Puedes crear y editar contenido"}
@@ -146,7 +131,7 @@ export default function WorkspaceTopBar() {
                   ))
                 ) : (
                   <p className="text-sm text-slate-400 text-center py-6">
-                    No hay miembros agregados aún
+                    No hay miembros agregados a├║n
                   </p>
                 )}
               </div>
@@ -154,7 +139,7 @@ export default function WorkspaceTopBar() {
               {/* FOOTER */}
               {canInvite && (
                 <p className="text-xs text-slate-400 text-center mt-4">
-                  Puedes invitar nuevos colaboradores desde el botón "Invitar".
+                  Puedes invitar nuevos colaboradores desde el bot├│n "Invitar".
                 </p>
               )}
             </motion.div>
