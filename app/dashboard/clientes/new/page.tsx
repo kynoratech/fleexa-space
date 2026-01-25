@@ -1,8 +1,9 @@
+"use client";
+
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
 export const revalidate = false;
 
-"use client";
 
 import { useState, useEffect } from "react";
 import { auth } from "@/lib/firebase";
