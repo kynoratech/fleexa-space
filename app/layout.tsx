@@ -1,15 +1,16 @@
 "use client";
 
+/**
+ * 🔥 BLOQUEA PRERENDER EN BUILD
+ */
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const runtime = "nodejs";
 
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return (
-    <div className="min-h-screen bg-[#0B1220] text-slate-100">
-      {children}
-    </div>
-  );
+  return <>{children}</>;
 }
