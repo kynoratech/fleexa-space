@@ -1,7 +1,9 @@
 "use client";
 
+export const dynamic = "force-dynamic";
+
 import { useEffect, useState } from "react";
-import { auth, db } from "@/lib/firebase";
+import { db } from "@/lib/firebase";
 import { collection, onSnapshot } from "firebase/firestore";
 import { useActiveWorkspace } from "@/lib/useActiveWorkspace";
 
@@ -13,6 +15,7 @@ export default function CalendarPage() {
     if (!workspace?.workspaceId) return;
 
     const ref = collection(db, "workspaces", workspace.workspaceId, "tasks");
+
     return onSnapshot(ref, (snap) => {
       setTasks(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     });
