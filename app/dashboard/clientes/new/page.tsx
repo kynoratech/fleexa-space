@@ -4,20 +4,14 @@ export const dynamic = "force-dynamic";
 
 import { useState, useEffect } from "react";
 import { auth } from "@/lib/firebase";
-import { useRouter, usePathname } from "next/navigation";
 import { onAuthStateChanged, signOut } from "firebase/auth";
+import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
+
 import { ArrowLeft, UserPlus, Save, LogOut, Loader2 } from "lucide-react";
-import { getUserPlan } from "@/lib/workspace";
-import { canAddClient, getClientLimitMessage } from "@/lib/plans";
+
 import WorkspaceTopBar from "../../../components/WorkspaceTopBar";
-import {
-  getUserByFirebaseUid,
-  getUserWorkspacesFromNeon,
-  getWorkspaceClientsFromNeon,
-  createClientInNeon,
-  createWorkspaceInNeon,
-} from "@/actions/neonOperations";
+import { createClientServer } from "@/actions/createClient";
 import { createWorkspaceClientInFirestore } from "@/actions/firestoreOperations";
 import { useActiveWorkspace } from "@/lib/useActiveWorkspace";
 
@@ -34,6 +28,9 @@ export default function NewClientPage() {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
 
+  /* ===============================
+     AUTH
+  =============================== */
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (usr) => {
       if (!usr) {
@@ -45,99 +42,47 @@ export default function NewClientPage() {
     return () => unsub();
   }, [router]);
 
+  /* ===============================
+     SUBMIT
+  =============================== */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
-    if (!nombre.trim() || !user || !workspace) return;
+    if (!user || !workspace || !nombre.trim()) return;
 
     setLoading(true);
     try {
       /* ===============================
-         1️⃣ Usuario Neon (INT)
+         1️⃣ Crear cliente (SERVER)
       =============================== */
-      const neonUser = await getUserByFirebaseUid(user.uid);
-      if (!neonUser) throw new Error("USER_NOT_IN_NEON");
+      const newClient = await createClientServer({
+        firebaseUid: user.uid,
+        workspace: {
+          id: workspace.workspaceId, // Firebase workspace ID
+          name: workspace.name,
+        },
+        nombre: nombre.trim(),
+        email: email.trim() || undefined,
+        phone: phone.trim() || undefined,
+      });
 
       /* ===============================
-         2️⃣ Workspace Neon REAL (INT)
-         🔴 ESTE ERA EL BUG
-      =============================== */
-      let memberships = await getUserWorkspacesFromNeon(neonUser.id);
-
-      if (!memberships || memberships.length === 0) {
-        // 🔥 El workspace existe en Firebase, pero NO en Neon
-        // → lo creamos en Neon ahora
-
-        const wsName = workspace.name;
-        const wsSlug = workspace.name
-          .toLowerCase()
-          .replace(/\s+/g, "-")
-          .replace(/[^a-z0-9-]/g, "");
-
-        const newWorkspace = await createWorkspaceInNeon(
-          neonUser.id,
-          wsName,
-          wsSlug
-        );
-
-        memberships = [
-          {
-            workspaceId: newWorkspace.id,
-            id: 0,
-            userId: 0,
-            role: "",
-            createdAt: new Date()
-          },
-        ];
-      }
-
-      const neonWorkspaceId = memberships[0].workspaceId;
-
-      if (!Number.isInteger(neonWorkspaceId)) {
-        throw new Error("INVALID_NEON_WORKSPACE_ID");
-      }
-
-      /* ===============================
-         3️⃣ Plan y límite
-      =============================== */
-      const plan = await getUserPlan(user.uid);
-
-      const currentClients = await getWorkspaceClientsFromNeon(neonWorkspaceId);
-
-      if (!canAddClient(plan, currentClients.length)) {
-        setError(getClientLimitMessage(plan));
-        setLoading(false);
-        return;
-      }
-
-      /* ===============================
-         4️⃣ Crear cliente en Neon
-      =============================== */
-      const newClient = await createClientInNeon(
-        neonWorkspaceId,
-        nombre.trim(),
-        email.trim() || undefined,
-        phone.trim() || undefined
-      );
-
-      /* ===============================
-         5️⃣ Guardar espejo en Firestore
-         (AQUÍ sí va el ID Firebase)
+         2️⃣ Guardar espejo en Firestore
       =============================== */
       await createWorkspaceClientInFirestore(
-        workspace.workspaceId, // Firebase ID
+        workspace.workspaceId, // Firebase workspace ID
         user.uid,
         nombre,
         email,
         phone,
-        newClient.id
+        newClient.id // Neon client ID
       );
 
-      router.push(`/dashboard/clientes`);
-    } catch (err) {
+      router.push("/dashboard/clientes");
+    } catch (err: any) {
       console.error(err);
-      setError("Error al crear el registro.");
+      setError(err.message || "Error al crear el registro.");
     } finally {
       setLoading(false);
     }
@@ -161,7 +106,11 @@ export default function NewClientPage() {
 
         <nav className="flex flex-col gap-1 text-sm flex-1">
           <SidebarLink href="/dashboard" label="Dashboard" active={pathname === "/dashboard"} />
-          <SidebarLink href="/dashboard/clientes" label="Clientes" active={pathname.includes("/dashboard/clientes")} />
+          <SidebarLink
+            href="/dashboard/clientes"
+            label="Clientes"
+            active={pathname.includes("/dashboard/clientes")}
+          />
           <SidebarLink href="/dashboard/proyectos" label="Proyectos" active={pathname === "/dashboard/proyectos"} />
           <SidebarLink href="/dashboard/finanzas" label="Finanzas" active={pathname === "/dashboard/finanzas"} />
         </nav>
@@ -242,10 +191,10 @@ export default function NewClientPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="bg-indigo-600 px-8 py-3 rounded-xl font-semibold"
+                className="bg-indigo-600 px-8 py-3 rounded-xl font-semibold flex items-center gap-2"
               >
                 {loading ? <Loader2 className="animate-spin" /> : <Save />}
-                {loading ? " Registrando..." : " Guardar Cliente"}
+                {loading ? "Registrando..." : "Guardar Cliente"}
               </button>
             </div>
           </form>
@@ -255,7 +204,17 @@ export default function NewClientPage() {
   );
 }
 
-function SidebarLink({ href, label, active }: { href: string; label: string; active?: boolean }) {
+/* ================= COMPONENTE SIDEBAR ================= */
+
+function SidebarLink({
+  href,
+  label,
+  active,
+}: {
+  href: string;
+  label: string;
+  active?: boolean;
+}) {
   return (
     <Link
       href={href}
