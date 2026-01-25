@@ -11,8 +11,6 @@ import Link from "next/link";
 import { ArrowLeft, UserPlus, Save, LogOut, Loader2 } from "lucide-react";
 
 import WorkspaceTopBar from "../../../components/WorkspaceTopBar";
-import { createClientServer } from "@/actions/createClient";
-import { createWorkspaceClientInFirestore } from "@/actions/firestoreOperations";
 import { useActiveWorkspace } from "@/lib/useActiveWorkspace";
 
 export default function NewClientPage() {
@@ -45,48 +43,45 @@ export default function NewClientPage() {
   /* ===============================
      SUBMIT
   =============================== */
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setError(null);
 
-    if (!user || !workspace || !nombre.trim()) return;
+  if (!user || !workspace || !nombre.trim()) return;
 
-    setLoading(true);
-    try {
-      /* ===============================
-         1️⃣ Crear cliente (SERVER)
-      =============================== */
-      const newClient = await createClientServer({
+  setLoading(true);
+
+  try {
+    const res = await fetch("/api/internal/create-client", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
         firebaseUid: user.uid,
         workspace: {
-          id: workspace.workspaceId, // Firebase workspace ID
+          id: workspace.workspaceId,
           name: workspace.name,
         },
         nombre: nombre.trim(),
         email: email.trim() || undefined,
         phone: phone.trim() || undefined,
-      });
+      }),
+    });
 
-      /* ===============================
-         2️⃣ Guardar espejo en Firestore
-      =============================== */
-      await createWorkspaceClientInFirestore(
-        workspace.workspaceId, // Firebase workspace ID
-        user.uid,
-        nombre,
-        email,
-        phone,
-        newClient.id // Neon client ID
-      );
+    const data = await res.json();
 
-      router.push("/dashboard/clientes");
-    } catch (err: any) {
-      console.error(err);
-      setError(err.message || "Error al crear el registro.");
-    } finally {
-      setLoading(false);
+    if (!res.ok || !data.ok) {
+      throw new Error(data.error || "Error al crear cliente");
     }
-  };
+
+    router.push("/dashboard/clientes");
+  } catch (err: any) {
+    console.error(err);
+    setError(err.message || "Error inesperado");
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   if (!user) return null;
 
