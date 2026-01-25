@@ -1,22 +1,11 @@
-import "./globals.css";
-import type { Metadata } from "next";
+"use client";
 
-export const metadata: Metadata = {
-  title: {
-    default: "Fleexa Space",
-    template: "%s • Fleexa Space",
-  },
-  description: "Tu espacio de trabajo inteligente para freelancers y pequeños negocios.",
-};
+export const dynamic = "force-dynamic";
 
-export default function RootLayout({
+export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return (
-    <html lang="es">
-      <body>{children}</body>
-    </html>
-  );
+  return <>{children}</>;
 }
