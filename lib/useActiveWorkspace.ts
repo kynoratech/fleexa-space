@@ -28,6 +28,11 @@ export function useActiveWorkspace() {
   const searchParams = useSearchParams();
   const wsParam = searchParams.get("ws");
 
+  const storedWorkspaceId =
+    typeof window !== "undefined"
+      ? localStorage.getItem("activeWorkspaceId")
+      : null;
+
   const [workspace, setWorkspace] = useState<ActiveWorkspace | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -59,17 +64,34 @@ export function useActiveWorkspace() {
           return;
         }
 
-        // 2️⃣ workspace activo
-        const member =
+        // 2️⃣ resolver workspace activo (orden IMPORTANTE)
+        const memberDoc =
           membersSnap.docs.find(
             (d) => d.data().workspaceId === wsParam
-          )?.data() ?? membersSnap.docs[0].data();
+          ) ??
+          membersSnap.docs.find(
+            (d) => d.data().workspaceId === storedWorkspaceId
+          ) ??
+          membersSnap.docs.find(
+            (d) => d.data().role === "owner"
+          ) ??
+          membersSnap.docs[0];
 
-        const workspaceId = member?.workspaceId;
+        if (!memberDoc) {
+          setWorkspace(null);
+          setLoading(false);
+          return;
+        }
+
+        const member = memberDoc.data();
+        const workspaceId = member.workspaceId;
 
         if (!workspaceId) {
           throw new Error("INVALID_WORKSPACE_ID");
         }
+
+        // Guardar workspace activo
+        localStorage.setItem("activeWorkspaceId", workspaceId);
 
         // 3️⃣ workspace data
         const wsRef = doc(db, "workspaces", workspaceId);

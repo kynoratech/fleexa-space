@@ -17,13 +17,17 @@ export default function InviteMemberModal({ open, onClose }: Props) {
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<"viewer" | "editor" | "admin">("viewer");
   const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState<string | null>(null);
+
 
   if (!workspace) return null;
 
   async function handleInvite() {
     if (!email || !workspace) return;
+
     try {
       setLoading(true);
+
       await addDoc(collection(db, "invitations"), {
         email: email.toLowerCase().trim(),
         role,
@@ -31,15 +35,26 @@ export default function InviteMemberModal({ open, onClose }: Props) {
         invitedAt: serverTimestamp(),
         status: "pending",
       });
+
+      // ✅ MENSAJE DE ÉXITO
+      setSuccess("Invitación enviada con éxito");
+
       setEmail("");
       setRole("viewer");
-      onClose();
+
+      // ⏱️ cerrar modal después de un momento
+      setTimeout(() => {
+        setSuccess(null);
+        onClose();
+      }, 1800);
+
     } catch (err) {
       console.error("Invite error", err);
     } finally {
       setLoading(false);
     }
   }
+
 
   return (
     <AnimatePresence>
@@ -79,6 +94,18 @@ export default function InviteMemberModal({ open, onClose }: Props) {
                   <X size={20} />
                 </button>
               </div>
+              <AnimatePresence>
+                {success && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    className="mb-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-400 font-semibold text-center"
+                  >
+                    ✅ {success}
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               <div className="space-y-6">
                 {/* Input de Email */}

@@ -12,12 +12,11 @@ export default function PendingInvitesBanner() {
 
   const [invites, setInvites] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [success, setSuccess] = useState<string | null>(null);
 
   useEffect(() => {
-    // ✅ guard TOTAL para TypeScript
     if (!user || !user.email) return;
 
-    // ✅ variable segura (TS ya no molesta)
     const email = user.email.toLowerCase();
 
     async function loadInvites() {
@@ -26,7 +25,6 @@ export default function PendingInvitesBanner() {
 
         const data = await getPendingInvitesByEmail(email);
 
-        // 🔥 FIX LEGACY: completar workspaceName si no existe
         const enriched = await Promise.all(
           data.map(async (invite: any) => {
             if (invite.workspaceName) return invite;
@@ -62,7 +60,7 @@ export default function PendingInvitesBanner() {
     loadInvites();
   }, [user]);
 
-  if (loading || invites.length === 0) return null;
+  if (loading) return null;
 
   async function handleAccept(invite: any) {
     if (!user) return;
@@ -78,6 +76,12 @@ export default function PendingInvitesBanner() {
       });
 
       setInvites((prev) => prev.filter((i) => i.id !== invite.id));
+
+      setSuccess(`Te uniste exitosamente a "${invite.workspaceName}"`);
+
+      setTimeout(() => {
+        setSuccess(null);
+      }, 2000);
     } catch (error: any) {
       console.error("Error aceptando invite:", error);
       alert("No se pudo unir: " + error.message);
@@ -85,33 +89,45 @@ export default function PendingInvitesBanner() {
   }
 
   return (
-    <div className="mb-6 rounded-xl border border-sky-500/30 bg-sky-500/10 p-4">
-      <h2 className="text-sm font-semibold text-sky-300 mb-2">
-        Invitaciones pendientes ({invites.length})
-      </h2>
+    <>
+      {/* ✅ MENSAJE DE ÉXITO */}
+      {success && (
+        <div className="mb-6 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm font-semibold text-emerald-400">
+          ✅ {success}
+        </div>
+      )}
 
-      <div className="space-y-3">
-        {invites.map((invite) => (
-          <div
-            key={invite.id}
-            className="flex items-center justify-between gap-3"
-          >
-            <div className="text-sm text-slate-200">
-              Te invitaron al workspace{" "}
-              <span className="font-semibold text-white">
-                {invite.workspaceName ?? "Sin nombre"}
-              </span>
-            </div>
+      {/* 📩 INVITACIONES */}
+      {invites.length > 0 && (
+        <div className="mb-6 rounded-xl border border-sky-500/30 bg-sky-500/10 p-4">
+          <h2 className="text-sm font-semibold text-sky-300 mb-2">
+            Invitaciones pendientes ({invites.length})
+          </h2>
 
-            <button
-              onClick={() => handleAccept(invite)}
-              className="rounded-md bg-sky-600 hover:bg-sky-500 transition px-3 py-1.5 text-xs font-medium"
-            >
-              Unirme
-            </button>
+          <div className="space-y-3">
+            {invites.map((invite) => (
+              <div
+                key={invite.id}
+                className="flex items-center justify-between gap-3"
+              >
+                <div className="text-sm text-slate-200">
+                  Te invitaron al workspace{" "}
+                  <span className="font-semibold text-white">
+                    {invite.workspaceName ?? "Sin nombre"}
+                  </span>
+                </div>
+
+                <button
+                  onClick={() => handleAccept(invite)}
+                  className="rounded-md bg-sky-600 hover:bg-sky-500 transition px-3 py-1.5 text-xs font-medium"
+                >
+                  Unirme
+                </button>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
-    </div>
+        </div>
+      )}
+    </>
   );
 }

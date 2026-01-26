@@ -7,6 +7,8 @@ import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
+import { PLAN_LIMITS } from "@/lib/plans";
+
 import { 
   FolderPlus, 
   Briefcase, 
@@ -25,6 +27,8 @@ export default function ProjectsPage() {
   const pathname = usePathname();
   const { workspace } = useActiveWorkspace();
   const [projects, setProjects] = useState<any[]>([]);
+  const maxProjects = PLAN_LIMITS[workspace?.plan || "free"].maxProjects;
+  const canCreateProject = projects.length < maxProjects;
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
 
@@ -89,13 +93,30 @@ export default function ProjectsPage() {
             <p className="text-slate-400 text-sm mt-1">Gestión de flujo de trabajo y activos de producción.</p>
           </div>
 
-          <Link
-            href="/dashboard/proyectos/new"
-            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-3 rounded-xl text-sm font-semibold transition-all shadow-lg shadow-indigo-500/20 active:scale-95 w-fit"
-          >
-            <FolderPlus size={18} />
-            Nuevo Proyecto
-          </Link>
+          {canCreateProject ? (
+            <Link
+              href="/dashboard/proyectos/new"
+              className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-3 rounded-xl text-sm font-semibold transition-all shadow-lg shadow-indigo-500/20 active:scale-95 w-fit"
+            >
+              <FolderPlus size={18} />
+              Nuevo Proyecto
+            </Link>
+          ) : (
+            <div className="relative group w-fit">
+              <button
+                disabled
+                className="flex items-center gap-2 bg-indigo-600/40 text-white px-6 py-3 rounded-xl text-sm font-semibold opacity-60 cursor-not-allowed"
+              >
+                <FolderPlus size={18} />
+                Nuevo Proyecto
+              </button>
+
+              {/* Tooltip */}
+              <div className="absolute right-0 mt-2 w-64 rounded-lg bg-slate-900 text-white text-xs px-3 py-2 opacity-0 group-hover:opacity-100 transition pointer-events-none z-50">
+                Límite alcanzado. El plan Free permite hasta {maxProjects} proyectos.
+              </div>
+            </div>
+          )}
         </div>
 
         {/* LISTADO DE PROYECTOS */}
